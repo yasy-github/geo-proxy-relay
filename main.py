@@ -1,15 +1,30 @@
 import os
 import httpx
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.responses import Response
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI()
-
 API_KEY = os.getenv("API_KEY")
-TIMEOUT = 30.0
+
+TIMEOUT = httpx.Timeout(
+    connect=10.0,
+    read=30.0,
+    write=10.0,
+    pool=5.0,
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.client = httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True)
+    yield                          # app runs here
+    await app.state.client.aclose()
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 
 def verify_api_key(x_api_key: str = Header(...)):
@@ -17,19 +32,15 @@ def verify_api_key(x_api_key: str = Header(...)):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
-@app.api_route("/forward", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/exchange-rate", methods=["GET"])
 async def forward(request: Request, _: None = Depends(verify_api_key)):
     """
     Forward any request to a target URL.
     Caller must pass:
       - Header: X-API-Key
-      - Header: X-Target-URL  (the actual Cambodian endpoint to hit)
     """
-    target_url = request.headers.get("X-Target-URL")
-    if not target_url:
-        raise HTTPException(status_code=400, detail="Missing X-Target-URL header")
+    target_url = "https://nbc.gov.kh/english/economic_research/exchange_rate.php"
 
-    # Forward original headers, strip hop-by-hop and our custom ones
     excluded = {"host", "x-api-key", "x-target-url", "content-length"}
     forward_headers = {
         k: v for k, v in request.headers.items()
@@ -38,23 +49,35 @@ async def forward(request: Request, _: None = Depends(verify_api_key)):
 
     body = await request.body()
 
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        try:
-            proxied = await client.request(
-                method=request.method,
-                url=target_url,
-                headers=forward_headers,
-                content=body,
-                params=dict(request.query_params),
-                follow_redirects=True,
-            )
-        except httpx.RequestError as e:
-            raise HTTPException(status_code=502, detail=f"Upstream error: {str(e)}")
+    # Use the shared client from app.state — never instantiate a new one here
+    client: httpx.AsyncClient = request.app.state.client
+
+    try:
+        proxied = await client.request(
+            method=request.method,
+            url=target_url,
+            headers=forward_headers,
+            content=body,
+            params=dict(request.query_params),
+        )
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Upstream error: {str(e)}")
+
+    # Strip headers that conflict with the decompressed body
+    excluded_response_headers = {
+        "content-length",
+        "transfer-encoding",
+        "content-encoding",  # body is already decoded by httpx
+    }
+    response_headers = {
+        k: v for k, v in proxied.headers.items()
+        if k.lower() not in excluded_response_headers
+    }
 
     return Response(
         content=proxied.content,
         status_code=proxied.status_code,
-        headers=dict(proxied.headers),
+        headers=response_headers,
         media_type=proxied.headers.get("content-type"),
     )
 
