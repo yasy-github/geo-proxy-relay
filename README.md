@@ -25,10 +25,22 @@ The blocked website/service sends a request with an `X-Target-URL` header. The p
 
 ## Requirements
 
-- Raspberry Pi 3B running a Ubuntu Server
+- Raspberry Pi 3B+ running a Ubuntu Server
 - Python 3.10+
 - Cloudflare account with a domain
 - `cloudflared` installed on the Pi
+
+---
+
+## Hardware (Raspberry Pi 3B)
+
+| Component | Spec                        |
+| --------- | --------------------------- |
+| Board     | Raspberry Pi 3B             |
+| CPU       | 4× ARM Cortex-A53 @ 1.2GHz  |
+| RAM       | 1 GB LPDDR2                 |
+| Network   | 100 Mbps (over USB 2.0 bus) |
+| Storage   | microSD                     |
 
 ---
 
@@ -129,10 +141,6 @@ sudo apt install cloudflared
 
 ## Systemd service
 
-```bash
-sudo ln -s /opt/geo-proxy-relay/geo-proxy-relay.service /etc/systemd/system/
-```
-
 ```ini
 [Unit]
 Description=Geo Proxy Relay (FastAPI)
@@ -150,16 +158,11 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### Enable both services
-
 ```bash
+sudo ln -s /opt/geo-proxy-relay/geo-proxy-relay.service /etc/systemd/system/
 sudo systemctl daemon-reload
-
 sudo systemctl enable geo-proxy-relay
 sudo systemctl start geo-proxy-relay
-
-sudo systemctl enable cloudflared
-sudo systemctl start cloudflared
 ```
 
 ---
@@ -219,15 +222,3 @@ data = response.json()
 - API key is passed via `X-API-Key` header — safe over HTTPS
 - Cloudflare handles TLS — no SSL cert management needed on the Pi
 - Systemd service runs as `root` user
-
----
-
-## Hardware
-
-| Component | Spec                        |
-| --------- | --------------------------- |
-| Board     | Raspberry Pi 3B             |
-| CPU       | 4× ARM Cortex-A53 @ 1.2GHz  |
-| RAM       | 1 GB LPDDR2                 |
-| Network   | 100 Mbps (over USB 2.0 bus) |
-| Storage   | microSD                     |
