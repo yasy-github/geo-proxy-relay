@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Testing / coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage/
+.pytest_cache/
+
+# Type checking
+.mypy_cache/
+
+# Virtual environments
+.venv
+venv/
+env/
+env3/
+
+# IDE files (VS Code, PyCharm)
+.vscode/
+.idea/
+
+# OS temporary files
+.DS_Store
+Thumbs.db
+
+# Application specific
+test.db
+log.txt
+*.env
+.env
