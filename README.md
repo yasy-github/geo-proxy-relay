@@ -101,7 +101,15 @@ curl -X GET http://localhost:8080/exchange-rate \
 ### Install cloudflared
 
 ```bash
+# Add Cloudflare's GPG key
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
 
+# Add the repository to apt
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+
+sudo apt update
+sudo apt install cloudflared
 ```
 
 ### Create tunnel via Cloudflare dashboard
@@ -122,7 +130,7 @@ curl -X GET http://localhost:8080/exchange-rate \
 ## Systemd service
 
 ```bash
-sudo nano /etc/systemd/system/geo-proxy-relay.service
+sudo ln -s /opt/geo-proxy-relay/geo-proxy-relay.service /etc/systemd/system/
 ```
 
 ```ini
@@ -132,8 +140,6 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=ubuntu
-Type=simple
 WorkingDirectory=/opt/geo-proxy-relay
 EnvironmentFile=/opt/geo-proxy-relay/.env
 ExecStart=/opt/geo-proxy-relay/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080
