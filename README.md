@@ -126,9 +126,9 @@ sudo apt install cloudflared
 
 ### Create tunnel via Cloudflare dashboard
 
-1. Go to **Cloudflare Zero Trust** → **Networks** → **Tunnels**
+1. Go to **Cloudflare Zero Trust** → **Networks** → **Connectors**
 2. Click **Create a tunnel** → give it a proper name (for example, `proxy-relay-tunnel`)
-3. Under **Public Hostname**, add:
+3. Configure a tunnel, under **Published application routes**, add:
 
 | Field        | Value            |
 | ------------ | ---------------- |
