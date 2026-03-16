@@ -1,17 +1,19 @@
 import os
 import httpx
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.responses import Response, HTMLResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from dotenv import load_dotenv
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-load_dotenv()
+from utils import verify_api_key, validate_target_url
+from cache import CacheManager
 
-API_KEY = os.getenv("API_KEY")
+cache = CacheManager(int(os.getenv("CACHE_TTL", 14400)))    # 4 hours by default
+
 
 TIMEOUT = httpx.Timeout(
     connect=10.0,
@@ -20,22 +22,17 @@ TIMEOUT = httpx.Timeout(
     pool=5.0,
 )
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address)  # rate limiter
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.client = httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True)
     app.state.limiter = limiter
-    yield                          # app runs here
+    yield       # app runs here
     await app.state.client.aclose()
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
-
-
-def verify_api_key(x_api_key: str = Header(...)):
-    if x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
 
 
 @app.get("/exchange-rate")
@@ -47,6 +44,19 @@ async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
       - Header: X-API-Key
     """
     target_url = "https://nbc.gov.kh/english/economic_research/exchange_rate.php"
+    validate_target_url(target_url)
+
+    use_cache = request.method == "GET"
+    if use_cache:
+        cache_key = cache.make_key(target_url, dict(request.query_params))
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(
+                content=cached['content'],
+                status_code=cached['status_code'],
+                headers=cached['headers'],
+                media_type=cached['media_type'],
+            )
 
     excluded = {"host", "x-api-key", "x-target-url", "content-length"}
     forward_headers = {
@@ -81,6 +91,15 @@ async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
         if k.lower() not in excluded_response_headers
     }
 
+    if use_cache and proxied.status_code == 200:
+        cache.set(
+            cache_key,
+            proxied.content,
+            proxied.status_code,
+            response_headers,
+            proxied.headers.get("content-type"),
+        )
+
     return Response(
         content=proxied.content,
         status_code=proxied.status_code,
@@ -104,3 +123,14 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# === CACHE ===
+
+@app.delete('/cache')
+async def clear_cache(_: None = Depends(verify_api_key)):
+    count = cache.clear()
+    return {"cleared": count}
+
+@app.get('/cache/info')
+async def cache_info(_: None = Depends(verify_api_key)):
+    return {'size': cache.size(), 'ttl': cache.ttl}
