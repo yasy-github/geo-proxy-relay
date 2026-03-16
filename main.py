@@ -11,6 +11,7 @@ from slowapi.util import get_remote_address
 
 from utils import verify_api_key, validate_target_url
 from cache import CacheManager
+from rewrite import rewrite_urls
 
 cache = CacheManager(int(os.getenv("CACHE_TTL", 14400)))    # 4 hours by default
 
@@ -91,20 +92,26 @@ async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
         if k.lower() not in excluded_response_headers
     }
 
+    content = proxied.content
+    media_type = proxied.headers.get("content-type")
+    if "text/html" in media_type:
+        # Load static assets from target site
+        content = rewrite_urls(content, target_url)
+
     if use_cache and proxied.status_code == 200:
         cache.set(
             cache_key,
-            proxied.content,
+            content,
             proxied.status_code,
             response_headers,
-            proxied.headers.get("content-type"),
+            media_type,
         )
 
     return Response(
-        content=proxied.content,
+        content=content,
         status_code=proxied.status_code,
         headers=response_headers,
-        media_type=proxied.headers.get("content-type"),
+        media_type=media_type,
     )
 
 @app.get("/", response_class=HTMLResponse)
