@@ -1,17 +1,14 @@
-import os
 import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.responses import Response, HTMLResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from dotenv import load_dotenv
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-load_dotenv()
+from utils import verify_api_key, validate_target_url
 
-API_KEY = os.getenv("API_KEY")
 
 TIMEOUT = httpx.Timeout(
     connect=10.0,
@@ -33,11 +30,6 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 
-def verify_api_key(x_api_key: str = Header(...)):
-    if x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-
 @app.get("/exchange-rate")
 @limiter.limit("5/minute")
 async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
@@ -47,6 +39,7 @@ async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
       - Header: X-API-Key
     """
     target_url = "https://nbc.gov.kh/english/economic_research/exchange_rate.php"
+    validate_target_url(target_url)
 
     excluded = {"host", "x-api-key", "x-target-url", "content-length"}
     forward_headers = {
