@@ -2,10 +2,12 @@ import os
 import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import Response, HTMLResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from fastapi.responses import Response
 from dotenv import load_dotenv
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 load_dotenv()
 
@@ -18,9 +20,12 @@ TIMEOUT = httpx.Timeout(
     pool=5.0,
 )
 
+limiter = Limiter(key_func=get_remote_address)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.client = httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True)
+    app.state.limiter = limiter
     yield                          # app runs here
     await app.state.client.aclose()
 
@@ -33,8 +38,9 @@ def verify_api_key(x_api_key: str = Header(...)):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
-@app.api_route("/exchange-rate", methods=["GET"])
-async def forward(request: Request, _: None = Depends(verify_api_key)):
+@app.get("/exchange-rate")
+@limiter.limit("5/minute")
+async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
     """
     Forward any request to a target URL.
     Caller must pass:
