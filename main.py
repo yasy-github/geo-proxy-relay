@@ -2,6 +2,7 @@ import os
 import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
+from fastapi.responses import HTMLResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.responses import Response
 from dotenv import load_dotenv
@@ -81,6 +82,18 @@ async def forward(request: Request, _: None = Depends(verify_api_key)):
         media_type=proxied.headers.get("content-type"),
     )
 
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    return """
+        <html>
+            <head>
+                <title>ERP CAMBODIA - Proxy Server</title>
+            </head>
+            <body>
+                <h1>Welcome to our proxy server</h1>
+            </body>
+        </html>
+    """
 
 @app.get("/health")
 async def health():
