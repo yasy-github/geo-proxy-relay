@@ -222,3 +222,15 @@ data = response.json()
 - API key is passed via `X-API-Key` header — safe over HTTPS
 - Cloudflare handles TLS — no SSL cert management needed on the Pi
 - Systemd service runs as `root` user
+
+---
+
+## Recovery Steps
+
+1. Flash Ubuntu Server to SD card
+2. SSH into Pi
+3. Run setup script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yasy-github/geo-proxy-relay/main/setup.sh | bash
+```
