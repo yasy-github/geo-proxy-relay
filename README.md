@@ -25,10 +25,22 @@ The blocked website/service sends a request with an `X-Target-URL` header. The p
 
 ## Requirements
 
-- Raspberry Pi 3B running a Ubuntu Server
+- Raspberry Pi 3B+ running a Ubuntu Server
 - Python 3.10+
 - Cloudflare account with a domain
 - `cloudflared` installed on the Pi
+
+---
+
+## Hardware (Raspberry Pi 3B)
+
+| Component | Spec                        |
+| --------- | --------------------------- |
+| Board     | Raspberry Pi 3B             |
+| CPU       | 4× ARM Cortex-A53 @ 1.2GHz  |
+| RAM       | 1 GB LPDDR2                 |
+| Network   | 100 Mbps (over USB 2.0 bus) |
+| Storage   | microSD                     |
 
 ---
 
@@ -101,14 +113,22 @@ curl -X GET http://localhost:8080/exchange-rate \
 ### Install cloudflared
 
 ```bash
+# Add Cloudflare's GPG key
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
 
+# Add the repository to apt
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+
+sudo apt update
+sudo apt install cloudflared
 ```
 
 ### Create tunnel via Cloudflare dashboard
 
-1. Go to **Cloudflare Zero Trust** → **Networks** → **Tunnels**
+1. Go to **Cloudflare Zero Trust** → **Networks** → **Connectors**
 2. Click **Create a tunnel** → give it a proper name (for example, `proxy-relay-tunnel`)
-3. Under **Public Hostname**, add:
+3. Configure a tunnel, under **Published application routes**, add:
 
 | Field        | Value            |
 | ------------ | ---------------- |
@@ -121,10 +141,6 @@ curl -X GET http://localhost:8080/exchange-rate \
 
 ## Systemd service
 
-```bash
-sudo nano /etc/systemd/system/geo-proxy-relay.service
-```
-
 ```ini
 [Unit]
 Description=Geo Proxy Relay (FastAPI)
@@ -132,8 +148,6 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=ubuntu
-Type=simple
 WorkingDirectory=/opt/geo-proxy-relay
 EnvironmentFile=/opt/geo-proxy-relay/.env
 ExecStart=/opt/geo-proxy-relay/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080
@@ -144,16 +158,11 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### Enable both services
-
 ```bash
+sudo ln -s /opt/geo-proxy-relay/geo-proxy-relay.service /etc/systemd/system/
 sudo systemctl daemon-reload
-
 sudo systemctl enable geo-proxy-relay
 sudo systemctl start geo-proxy-relay
-
-sudo systemctl enable cloudflared
-sudo systemctl start cloudflared
 ```
 
 ---
@@ -213,15 +222,3 @@ data = response.json()
 - API key is passed via `X-API-Key` header — safe over HTTPS
 - Cloudflare handles TLS — no SSL cert management needed on the Pi
 - Systemd service runs as `root` user
-
----
-
-## Hardware
-
-| Component | Spec                        |
-| --------- | --------------------------- |
-| Board     | Raspberry Pi 3B             |
-| CPU       | 4× ARM Cortex-A53 @ 1.2GHz  |
-| RAM       | 1 GB LPDDR2                 |
-| Network   | 100 Mbps (over USB 2.0 bus) |
-| Storage   | microSD                     |
