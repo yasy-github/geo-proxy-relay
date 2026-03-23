@@ -4,8 +4,25 @@ set -e
 echo "==> Updating system"
 sudo apt update && sudo apt upgrade -y
 
-echo "==> Installing dependencies"
-sudo apt install -y python3 python3-pip python3-venv git docker.io docker-compose
+echo "==> Removing conflicting packages"
+sudo apt remove -y containerd docker docker.io docker-compose
+sudo apt autoremove -y
+
+echo "==> Installing Docker from official repo"
+sudo apt install -y ca-certificates curl gnupg
+
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+sudo apt install -y git python3 python3-pip python3-venv \
+  docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 echo "==> Enabling Docker"
 sudo systemctl enable docker
