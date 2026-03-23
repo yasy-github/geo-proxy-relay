@@ -38,15 +38,7 @@ chmod +x cloudflared-linux-arm
 sudo mv cloudflared-linux-arm /usr/local/bin/cloudflared
 
 echo "==> Cloning project"
-sudo mkdir -p /opt/geo-proxy-relay
-sudo chown $USER:$USER /opt/geo-proxy-relay
-git clone https://github.com/yasy-github/geo-proxy-relay.git /opt/geo-proxy-relay
 cd /opt/geo-proxy-relay
-
-echo "==> Setting up .env"
-cp .env.example .env
-echo "!! Edit /opt/geo-proxy-relay/.env with your API key before continuing"
-read -p "Press enter when ready..."
 
 echo "==> Starting app"
 docker compose up -d
