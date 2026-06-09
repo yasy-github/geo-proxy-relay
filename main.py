@@ -8,6 +8,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from fake_useragent import UserAgent
 
 from utils import verify_api_key, validate_target_url
 from cache import CacheManager
@@ -24,6 +25,8 @@ TIMEOUT = httpx.Timeout(
 )
 
 limiter = Limiter(key_func=get_remote_address)  # rate limiter
+
+ua = UserAgent()    # fake-useragent generator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,6 +67,10 @@ async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
         k: v for k, v in request.headers.items()
         if k.lower() not in excluded
     }
+
+    # Dynamically generate a completely random browser User-Agent
+    random_user_agent = ua.random
+    forward_headers["user-agent"] = random_user_agent
 
     body = await request.body()
 

@@ -5,3 +5,4 @@ python-dotenv
 slowapi
 beautifulsoup4
 lxml
+fake-useragent
