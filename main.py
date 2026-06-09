@@ -14,6 +14,16 @@ from utils import verify_api_key, validate_target_url
 from cache import CacheManager
 from rewrite import rewrite_urls
 
+import logging
+import sys
+
+# Configure logging to print directly to stdout
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(levelname)s | %(message)s"
+)
+
 cache = CacheManager(int(os.getenv("CACHE_TTL", 14400)))    # 4 hours by default
 
 
@@ -71,6 +81,7 @@ async def exchange_rate(request: Request, _: None = Depends(verify_api_key)):
     # Dynamically generate a completely random browser User-Agent
     random_user_agent = ua.random
     forward_headers["user-agent"] = random_user_agent
+    logging.info(f"User-Agent -> {random_user_agent}")
 
     body = await request.body()
 
